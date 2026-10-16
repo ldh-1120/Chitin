@@ -48,10 +48,10 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             player.play(IDLE, tickCount);
 
         if (tickCount % 100 == 40)
-            player.play(ATTACK, tickCount);
+            player.crossFade(ATTACK, tickCount, 0.15f);
 
         if (ATTACK.equals(player.currentAnimation()) && player.getTimeSeconds(tickCount) >= ATTACK_DURATION)
-            player.play(IDLE, tickCount);
+            player.crossFade(IDLE, tickCount, 0.2f);
     }
 
     @Override

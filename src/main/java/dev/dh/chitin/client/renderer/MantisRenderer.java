@@ -5,7 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.dh.cascade.animation.AnimationClip;
 import dev.dh.cascade.animation.AnimationPlayer;
-import dev.dh.cascade.animation.AnimationSampler;
+import dev.dh.cascade.animation.AnimationBlender;
 import dev.dh.cascade.bedrock.BedrockAnimation;
 import dev.dh.cascade.bedrock.BedrockGeometry;
 import dev.dh.cascade.client.BedrockAnimationLoader;
@@ -36,6 +36,8 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
     private BedrockModelRenderer modelRenderer;
     private SkeletonPose skeletonPose;
+    private SkeletonPose previousPose;
+    private SkeletonPose currentPose;
     private Skeleton skeleton;
 
     private Map<String, AnimationClip> animationClips = Map.of();
@@ -52,14 +54,10 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
         if (modelRenderer != null && skeletonPose != null) {
             AnimationPlayer player = entity.motion().player();
-            String animationName = player.currentAnimation();
+            float nowTick = entity.tickCount + partialTick;
 
-            AnimationClip clip = animationName == null ? null : animationClips.get(animationName);
-            if (clip != null) {
-                float nowTick = entity.tickCount + partialTick;
-                AnimationSampler.apply(clip, skeletonPose, player.getTimeSeconds(nowTick));
-            } else
-                skeletonPose.reset();
+            AnimationPlayer.Frame frame = player.sampleFrame(nowTick);
+            AnimationBlender.apply(frame, animationClips, skeletonPose, previousPose, currentPose);
 
             poseStack.pushPose();
 
@@ -85,6 +83,8 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
         modelRenderer = null;
         skeleton = null;
         skeletonPose = null;
+        previousPose = null;
+        currentPose = null;
 
         loadedAnimations = null;
         animationClips = Map.of();
@@ -98,7 +98,10 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
             this.skeleton = skeletons.get(i);
 
             modelRenderer = new BedrockModelRenderer(geometry, skeleton);
+
             skeletonPose = new SkeletonPose(skeleton);
+            previousPose = new SkeletonPose(skeleton);
+            currentPose = new SkeletonPose(skeleton);
 
             break;
         }
