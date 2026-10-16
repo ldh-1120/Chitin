@@ -204,22 +204,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         double sin = Math.sin(angle);
 
         for (int i = 0; i < LEG_COUNT; i++) {
-            double localX = (i % 2 == 0 ? 7.0 : -7.0) / 16.0;
-            double localZ = (i / 2 - 1) * 6.0 / 16.0;
-
-            double leadX = Math.max(-0.20, Math.min(0.20, movementX * 2.0));
-            double leadZ = Math.max(-0.20, Math.min(0.20, movementZ * 2.0));
-
-            double x = getX() + localX * cos + localZ * sin + leadX;
-            double z = getZ() - localX * sin + localZ * cos + leadZ;
-
-            BlockHitResult hit = level().clip(new ClipContext(new Vec3(x, getY() + 2.0, z), new Vec3(x, getY() - 2.0, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
-            if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
-                continue;
-
-            desired[i] = hit.getLocation().add(0.0, 0.01, 0.0);
-
-            if (footTo[i] == null) {
+            desired[i] = findFootLanding(i, cos, sin, movementX, movementZ);
+            if (desired[i] != null && footTo[i] == null) {
                 footFrom[i] = desired[i];
                 footTo[i] = desired[i];
             }
@@ -277,6 +263,49 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             footFrom[i] = footTo[i];
             footTo[i] = desired[i];
         }
+    }
+
+    private Vec3 findFootLanding(int index, double cos, double sin, double movementX, double movementZ) {
+        int side = index % 2 == 0 ? 1 : -1;
+        int row = index / 2 - 1;
+
+        double localMovementX = movementX * cos - movementZ * sin;
+        double localMovementZ = movementX * sin + movementZ * cos;
+
+        double leadX = Math.max(-2.0 / 16.0, Math.min(2.0 / 16.0, localMovementX * 2.0));
+        double leadZ = Math.max(-2.0 / 16.0, Math.min(2.0 / 16.0, localMovementZ * 2.0));
+
+        double hipX = side * 3.0 / 16.0;
+        double hipY = 8.0 / 16.0;
+        double hipZ = row / 16.0;
+
+        double maxReach = 13.0 / 16.0;
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            double footX = side * 7.0 / 16.0 + (attempt == 0 ? leadX : 0.0);
+            double footZ = row * 6.0 / 16.0 + (attempt == 0 ? leadZ : 0.0);
+
+            double worldX = getX() + footX * cos + footZ * sin;
+            double worldZ = getZ() - footX * sin + footZ * cos;
+
+            BlockHitResult hit = level().clip(new ClipContext(new Vec3(worldX, getY() + 2.0, worldZ), new Vec3(worldX, getY() - 2.0, worldZ), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
+                continue;
+
+            Vec3 landing = hit.getLocation().add(0.0, 0.01, 0.0);
+
+            double dx = footX - hipX;
+            double dy = landing.y - getY() - hipY;
+            double dz = footZ - hipZ;
+
+            double distanceSquared = dx * dx + dy * dy + dz * dz;
+            if (distanceSquared > maxReach * maxReach)
+                continue;
+
+            return landing;
+        }
+
+        return null;
     }
 
     public Vec3 footPosition(int index, float partialTick, boolean includeLift) {
