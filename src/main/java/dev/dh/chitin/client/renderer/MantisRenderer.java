@@ -41,8 +41,6 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
         pose.rotateLocalDegrees("body", tilt.x(), 0.0f, tilt.y());
 
         float airBlend = entity.getAirBlend(partialTick);
-
-// 자연스럽게 시작하고 끝나는 보간 곡선.
         float blend = airBlend * airBlend * (3.0f - 2.0f * airBlend);
 
         for (int i = 0; i < LEGS.length; i++) {
@@ -52,26 +50,16 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
             int row = i / 2 - 1;
 
             Vector3f hip = pose.getModelPivot(name + "upper");
-
-            Vector3f airTarget = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
-            Vector3f airPole = new Vector3f(hip).add(side * 14.0f, 4.0f, row * 4.0f);
-
-            Vector3f groundPole = new Vector3f(side * 9.0f, 7.0f, row * 6.0f);
             Vec3 foot = entity.footPosition(i, partialTick, true);
 
-            Vector3f groundTarget = null;
-            if (foot != null)
-                groundTarget = toModelPosition(entity, entityYaw, partialTick, foot);
-            else if (!entity.onGround())
-                groundTarget = entity.getTakeoffTarget(i);
-
             Vector3f target;
-            if (groundTarget == null)
-                target = airTarget;
-            else
-                target = new Vector3f(groundTarget).lerp(airTarget, blend);
 
-            Vector3f pole = groundPole.lerp(airPole, blend);
+            if (foot != null)
+                target = toModelPosition(entity, entityYaw, partialTick, foot);
+            else
+                target = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
+
+            Vector3f pole = createLegPole(pose, hip, side, row);
             pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole);
         }
     }
@@ -94,7 +82,9 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
                 String name = LEGS[i];
                 Vector3f target = toModelPosition(entity, entityYaw, partialTick, foot);
                 Vector3f actual = pose.getModelPivot(name + "foot");
+                Vector3f knee = pose.getModelPivot(name + "lower");
 
+                drawMarker(stack, lines, knee, 0.30f, 1.0f, 0.8f, 0.2f);
                 drawMarker(stack, lines, target, 0.45f, 0.2f, 1.0f, 0.4f);
                 drawMarker(stack, lines, actual, 0.25f, 0.2f, 0.75f, 1.0f);
 
@@ -121,6 +111,13 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
         } finally {
             stack.popPose();
         }
+    }
+
+    private static Vector3f createLegPole(SkeletonPose pose, Vector3f hip, int side, int row) {
+        Vector3f offset = new Vector3f(side * 16.0f, 6.0f, row * 4.0f);
+        pose.getModelMatrix("body").transformDirection(offset);
+
+        return new Vector3f(hip).add(offset);
     }
 
     private static Vector3f toModelPosition(MantisEntity entity, float entityYaw, float partialTick, Vec3 worldPosition) {
