@@ -261,6 +261,9 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         }
 
         if (reset) {
+            Arrays.fill(footFrom, null);
+            Arrays.fill(footTo, null);
+
             movingGroup = -1;
             nextGroup = 0;
             if (!onGround())
@@ -298,26 +301,24 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         for (int candidate = 0; candidate < 2; candidate++) {
             int group = (nextGroup + candidate) % 2;
 
-            boolean ready = true;
             boolean needsStep = false;
 
             for (int i = 0; i < LEG_COUNT; i++) {
                 if (GROUP[i] != group)
                     continue;
 
-                if (desired[i] == null || footTo[i] == null) {
-                    ready = false;
-                    break;
-                }
+                if (desired[i] == null || footTo[i] == null)
+                    continue;
 
                 double dx = desired[i].x - footTo[i].x;
                 double dy = desired[i].y - footTo[i].y;
                 double dz = desired[i].z - footTo[i].z;
+
                 if (dx * dx + dz * dz > stepDistance * stepDistance || Math.abs(dy) > 0.15)
                     needsStep = true;
             }
 
-            if (ready && needsStep) {
+            if (needsStep) {
                 selectedGroup = group;
                 break;
             }
@@ -336,7 +337,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
                 continue;
 
             footFrom[i] = footTo[i];
-            footTo[i] = desired[i];
+            if (desired[i] != null)
+                footTo[i] = desired[i];
         }
     }
 
