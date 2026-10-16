@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.dh.cascade.animation.AnimationClip;
+import dev.dh.cascade.animation.AnimationPlayer;
 import dev.dh.cascade.animation.AnimationSampler;
 import dev.dh.cascade.bedrock.BedrockAnimation;
 import dev.dh.cascade.bedrock.BedrockGeometry;
@@ -20,7 +21,9 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     private static final ResourceLocation MODEL = ResourceLocation.fromNamespaceAndPath(Chitin.MOD_ID, "mantis");
@@ -28,15 +31,14 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     private static final ResourceLocation ANIMATIONS = ResourceLocation.fromNamespaceAndPath(Chitin.MOD_ID, "mantis");
     private static final String GEOMETRY_ID = "geometry.chitin.mantis";
 
-    private static final String IDLE_ANIMATION = "animation.mantis.idle";
-
     private List<BedrockGeometry> loadedGeometries;
+    private Map<String, BedrockAnimation> loadedAnimations;
+
     private BedrockModelRenderer modelRenderer;
     private SkeletonPose skeletonPose;
     private Skeleton skeleton;
 
-    private BedrockAnimation loadedAnimation;
-    private AnimationClip animationClip;
+    private Map<String, AnimationClip> animationClips = Map.of();
 
     public MantisRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -46,12 +48,16 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     @Override
     public void render(MantisEntity entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
         updateModel();
-        updateAnimation();
+        updateAnimations();
 
         if (modelRenderer != null && skeletonPose != null) {
-            if (animationClip != null) {
-                float timeSeconds = (entity.tickCount + partialTick) / 20.0f;
-                AnimationSampler.apply(animationClip, skeletonPose, timeSeconds);
+            AnimationPlayer player = entity.motion().player();
+            String animationName = player.currentAnimation();
+
+            AnimationClip clip = animationName == null ? null : animationClips.get(animationName);
+            if (clip != null) {
+                float nowTick = entity.tickCount + partialTick;
+                AnimationSampler.apply(clip, skeletonPose, player.getTimeSeconds(nowTick));
             } else
                 skeletonPose.reset();
 
@@ -75,12 +81,13 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
             return;
 
         loadedGeometries = geometries;
+
         modelRenderer = null;
         skeleton = null;
         skeletonPose = null;
 
-        loadedAnimation = null;
-        animationClip = null;
+        loadedAnimations = null;
+        animationClips = Map.of();
 
         List<Skeleton> skeletons = loader.getSkeletons(MODEL);
         for (int i = 0; i < geometries.size() && i < skeletons.size(); i++) {
@@ -97,17 +104,24 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
         }
     }
 
-    private void updateAnimation() {
-        BedrockAnimation animation = BedrockAnimationLoader.INSTANCE.get(ANIMATIONS, IDLE_ANIMATION);
-        if (animation == loadedAnimation)
+    private void updateAnimations() {
+        Map<String, BedrockAnimation> animations = BedrockAnimationLoader.INSTANCE.get(ANIMATIONS);
+        if (animations == loadedAnimations)
             return;
 
-        loadedAnimation = animation;
-        animationClip = null;
-        if (animation == null || skeleton == null)
+        loadedAnimations = animations;
+        if (skeleton == null) {
+            animationClips = Map.of();
             return;
+        }
 
-        animationClip = new AnimationClip(animation, skeleton);
+        Map<String, AnimationClip> compiled = new HashMap<>();
+        for (Map.Entry<String, BedrockAnimation> entry : animations.entrySet()) {
+            AnimationClip clip = new AnimationClip(entry.getValue(), skeleton);
+            compiled.put(entry.getKey(), clip);
+        }
+
+        animationClips = Map.copyOf(compiled);
     }
 
     @Override
