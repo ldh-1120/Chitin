@@ -3,7 +3,11 @@ package dev.dh.chitin.client.renderer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import dev.dh.cascade.animation.AnimationClip;
+import dev.dh.cascade.animation.AnimationSampler;
+import dev.dh.cascade.bedrock.BedrockAnimation;
 import dev.dh.cascade.bedrock.BedrockGeometry;
+import dev.dh.cascade.client.BedrockAnimationLoader;
 import dev.dh.cascade.client.BedrockGeometryLoader;
 import dev.dh.cascade.client.render.BedrockModelRenderer;
 import dev.dh.cascade.model.Skeleton;
@@ -21,11 +25,18 @@ import java.util.List;
 public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     private static final ResourceLocation MODEL = ResourceLocation.fromNamespaceAndPath(Chitin.MOD_ID, "mantis");
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(Chitin.MOD_ID, "textures/entity/mantis.png");
+    private static final ResourceLocation ANIMATIONS = ResourceLocation.fromNamespaceAndPath(Chitin.MOD_ID, "mantis");
     private static final String GEOMETRY_ID = "geometry.chitin.mantis";
+
+    private static final String IDLE_ANIMATION = "animation.mantis.idle";
 
     private List<BedrockGeometry> loadedGeometries;
     private BedrockModelRenderer modelRenderer;
     private SkeletonPose skeletonPose;
+    private Skeleton skeleton;
+
+    private BedrockAnimation loadedAnimation;
+    private AnimationClip animationClip;
 
     public MantisRenderer(EntityRendererProvider.Context context) {
         super(context);
@@ -35,8 +46,15 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     @Override
     public void render(MantisEntity entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
         updateModel();
+        updateAnimation();
 
         if (modelRenderer != null && skeletonPose != null) {
+            if (animationClip != null) {
+                float timeSeconds = (entity.tickCount + partialTick) / 20.0f;
+                AnimationSampler.apply(animationClip, skeletonPose, timeSeconds);
+            } else
+                skeletonPose.reset();
+
             poseStack.pushPose();
 
             poseStack.mulPose(Axis.YP.rotationDegrees(180.0f - entityYaw));
@@ -46,6 +64,8 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
             poseStack.popPose();
         }
+
+        super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 
     private void updateModel() {
@@ -56,7 +76,11 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
         loadedGeometries = geometries;
         modelRenderer = null;
+        skeleton = null;
         skeletonPose = null;
+
+        loadedAnimation = null;
+        animationClip = null;
 
         List<Skeleton> skeletons = loader.getSkeletons(MODEL);
         for (int i = 0; i < geometries.size() && i < skeletons.size(); i++) {
@@ -71,6 +95,19 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
             break;
         }
+    }
+
+    private void updateAnimation() {
+        BedrockAnimation animation = BedrockAnimationLoader.INSTANCE.get(ANIMATIONS, IDLE_ANIMATION);
+        if (animation == loadedAnimation)
+            return;
+
+        loadedAnimation = animation;
+        animationClip = null;
+        if (animation == null || skeleton == null)
+            return;
+
+        animationClip = new AnimationClip(animation, skeleton);
     }
 
     @Override
