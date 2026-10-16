@@ -31,7 +31,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private static final double STEP_DISTANCE = 0.12;
 
     private static final double HIP_HEIGHT = 8.0 / 16.0;
-    private static final double MAX_LEG_REACH = 13.0 / 16.0;
+    private static final double MAX_LEG_REACH = 19.0 / 16.0;
     private static final float MAX_BODY_OFFSET = 0.15f;
 
     private static final int[] GROUP = {0, 1, 1, 0, 0, 1};
@@ -261,9 +261,6 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         }
 
         if (reset) {
-            Arrays.fill(footFrom, null);
-            Arrays.fill(footTo, null);
-
             movingGroup = -1;
             nextGroup = 0;
             if (!onGround())
@@ -357,8 +354,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         double hipY = 8.0 / 16.0;
         double hipZ = row / 16.0;
 
-        double maxReach = 13.0 / 16.0;
-
+        double maxReach = MAX_LEG_REACH;
         for (int attempt = 0; attempt < 2; attempt++) {
             double footX = side * 7.0 / 16.0 + (attempt == 0 ? leadX : 0.0);
             double footZ = row * 6.0 / 16.0 + (attempt == 0 ? leadZ : 0.0);

@@ -14,7 +14,7 @@ public final class ModEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<MantisEntity>> MANTIS =
             ENTITY_TYPES.register("mantis", () ->
                     EntityType.Builder.of(MantisEntity::new, MobCategory.CREATURE)
-                            .sized(0.9f, 1.5f)
+                            .sized(0.7f, 1.4f)
                             .clientTrackingRange(8)
                             .build("chitin:mantis"));
 }
