@@ -5,12 +5,16 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Chitin
+        uses: actions/checkout@v4
+
+      - name: Checkout Cascade
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          repository: ldh-1120/Cascade
+          path: Cascade
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -21,5 +25,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle
+      - name: Publish Cascade locally
+        working-directory: Cascade
+        run: ./gradlew publishToMavenLocal
+
+      - name: Build Chitin
         run: ./gradlew build
