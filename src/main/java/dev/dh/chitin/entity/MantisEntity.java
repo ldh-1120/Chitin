@@ -17,6 +17,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import java.util.Arrays;
@@ -36,6 +37,9 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
     private final Vec3[] footFrom = new Vec3[LEG_COUNT];
     private final Vec3[] footTo = new Vec3[LEG_COUNT];
+
+    private final Vector2f previousTerrainTilt = new Vector2f();
+    private final Vector2f terrainTilt = new Vector2f();
 
     private int movingGroup = -1;
     private int nextGroup = 0;
@@ -85,7 +89,86 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         if (phase == 53)
             attackLayer.player().stop();
 
+        previousTerrainTilt.set(terrainTilt);
+
         updateFeet();
+        updateTerrainTilt();
+    }
+
+    private void updateTerrainTilt() {
+        double angle = Math.toRadians(180.0 - getYRot());
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+
+        double sx = 0.0;
+        double sy = 0.0;
+        double sz = 0.0;
+
+        double sxx = 0.0;
+        double sxz = 0.0;
+        double szz = 0.0;
+        double sxy = 0.0;
+        double szy = 0.0;
+
+        int count = 0;
+
+        for (int i = 0; i < LEG_COUNT; i++) {
+            Vec3 foot = footTo[i];
+            if (foot == null)
+                continue;
+
+            if (movingGroup >= 0 && GROUP[i] == movingGroup)
+                continue;
+
+            double dx = foot.x - getX();
+            double dz = foot.z - getZ();
+
+            double x = dx * cos - dz * sin;
+            double z = dx * sin + dz * cos;
+            double y = foot.y;
+
+            sx += x;
+            sy += y;
+            sz += z;
+
+            sxx += x * x;
+            sxz += x * z;
+            szz += z * z;
+            sxy += x * y;
+            szy += z * y;
+
+            count++;
+        }
+
+        float pitch = 0.0f;
+        float roll = 0.0f;
+
+        if (count >= 3) {
+            double xx = sxx - sx * sx / count;
+            double xz = sxz - sx * sz / count;
+            double zz = szz - sz * sz / count;
+            double xy = sxy - sx * sy / count;
+            double zy = szy - sz * sy / count;
+
+            double determinant = xx * zz - xz * xz;
+            if (determinant > 0.000001) {
+                double a = (xy * zz - zy * xz) / determinant;
+                double b = (zy * xx - xy * xz) / determinant;
+
+                pitch = (float) Math.toDegrees(-Math.atan(b));
+                roll = (float) Math.toDegrees(Math.atan(a));
+
+                pitch = Math.max(-10.0f, Math.min(10.0f, pitch));
+                roll = Math.max(-10.0f, Math.min(10.0f, roll));
+            }
+        }
+
+        terrainTilt.set(terrainTilt.x + (pitch - terrainTilt.x) * 0.20f, terrainTilt.y + (roll - terrainTilt.y) * 0.20f);
+    }
+
+    public Vector2f getTerrainTilt(float partialTick) {
+        float t = Math.max(0.0f, Math.min(1.0f, partialTick));
+        return new Vector2f(previousTerrainTilt).lerp(terrainTilt, t);
     }
 
     private void updateFeet() {
