@@ -19,19 +19,27 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
+import java.util.Arrays;
+
 public class MantisEntity extends PathfinderMob implements MotionEntity {
     private static final String IDLE = "animation.mantis.idle";
     private static final String ATTACK = "animation.mantis.attack";
 
+    private static final int LEG_COUNT = 6;
     private static final int STEP_TICKS = 6;
     private static final double STEP_DISTANCE = 0.16;
+
+    private static final int[] GROUP = {0, 1, 1, 0, 0, 1};
 
     private final MotionInstance motion = new MotionInstance();
     private final MotionLayer attackLayer = motion.addLayer("attack", BoneMask.subtree("head"), MotionLayer.Mode.OVERRIDE);
 
-    private final Vec3[] footFrom = new Vec3[2];
-    private final Vec3[] footTo = new Vec3[2];
-    private final int[] stepStartTick = {-1, -1};
+    private final Vec3[] footFrom = new Vec3[LEG_COUNT];
+    private final Vec3[] footTo = new Vec3[LEG_COUNT];
+
+    private int movingGroup = -1;
+    private int nextGroup = 0;
+    private int stepStartTick;
 
     public MantisEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -80,78 +88,104 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     }
 
     private void updateFeet() {
-        if (!onGround()) {
-            for (int i = 0; i < 2; i++) {
-                footFrom[i] = null;
-                footTo[i] = null;
-                stepStartTick[i] = -1;
+        boolean reset = !onGround();
+        if (!reset) {
+            for (Vec3 anchor : footTo) {
+                if (anchor != null && anchor.distanceToSqr(position()) > 4.0) {
+                    reset = true;
+                    break;
+                }
             }
-            return;
         }
 
-        float rotation = (float) Math.toRadians(180.0f - getYRot());
+        if (reset) {
+            Arrays.fill(footFrom, null);
+            Arrays.fill(footTo, null);
 
-        for (int i = 0; i < 2; i++) {
-            float xOffset = i == 0 ? 7.0f / 16.0f : -7.0f / 16.0f;
+            movingGroup = -1;
+            nextGroup = 0;
+            if (!onGround())
+                return;
+        }
 
-            Vector3f offset = new Vector3f(xOffset, 0.0f, -1.0f / 16.0f).rotateY(rotation);
+        Vec3[] desired = new Vec3[LEG_COUNT];
 
-            double x = getX() + offset.x();
-            double z = getZ() + offset.z();
+        double angle = Math.toRadians(180.0 - getYRot());
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
 
-            Vec3 start = new Vec3(x, getY() + 2.0, z);
-            Vec3 end = new Vec3(x, getY() - 2.0, z);
+        for (int i = 0; i < LEG_COUNT; i++) {
+            double localX = (i % 2 == 0 ? 7.0 : -7.0) / 16.0;
+            double localZ = (i / 2 - 1) * 6.0 / 16.0;
 
-            BlockHitResult hit = level().clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            double x = getX() + localX * cos + localZ * sin;
+            double z = getZ() - localX * sin + localZ * cos;
+
+            BlockHitResult hit = level().clip(new ClipContext(new Vec3(x, getY() + 2.0, z), new Vec3(x, getY() - 2.0, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
             if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP) {
                 footFrom[i] = null;
                 footTo[i] = null;
-                stepStartTick[i] = -1;
                 continue;
             }
 
-            Vec3 ground = hit.getLocation().add(0.0, 0.01, 0.0);
-            if (footTo[i] == null || footTo[i].distanceToSqr(position()) > 4.0) {
-                footFrom[i] = ground;
-                footTo[i] = ground;
-                stepStartTick[i] = -1;
+            desired[i] = hit.getLocation().add(0.0, 0.01, 0.0);
+
+            if (footTo[i] == null) {
+                footFrom[i] = desired[i];
+                footTo[i] = desired[i];
+            }
+        }
+
+        if (movingGroup >= 0) {
+            if (tickCount - stepStartTick >= STEP_TICKS) {
+                movingGroup = -1;
+                nextGroup = 1 - nextGroup;
+            }
+
+            return;
+        }
+
+        boolean shouldStep = false;
+        for (int i = 0; i < LEG_COUNT; i++) {
+            if (GROUP[i] != nextGroup)
                 continue;
-            }
 
-            if (stepStartTick[i] >= 0) {
-                if (tickCount - stepStartTick[i] < STEP_TICKS)
-                    continue;
+            if (desired[i] == null || footTo[i] == null)
+                return;
 
-                stepStartTick[i] = -1;
-                footFrom[i] = footTo[i];
-            }
+            double dx = desired[i].x - footTo[i].x;
+            double dy = desired[i].y - footTo[i].y;
+            double dz = desired[i].z - footTo[i].z;
 
-            int other = 1 - i;
-            if (stepStartTick[other] >= 0)
+            if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE || Math.abs(dy) > 0.15)
+                shouldStep = true;
+        }
+
+        if (!shouldStep)
+            return;
+
+        movingGroup = nextGroup;
+        stepStartTick = tickCount;
+        for (int i = 0; i < LEG_COUNT; i++) {
+            if (GROUP[i] != movingGroup)
                 continue;
 
-            double dx = ground.x - footTo[i].x;
-            double dz = ground.z - footTo[i].z;
-
-            if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE) {
-                footFrom[i] = footTo[i];
-                footTo[i] = ground;
-                stepStartTick[i] = tickCount;
-            }
+            footFrom[i] = footTo[i];
+            footTo[i] = desired[i];
         }
     }
 
     public Vec3 footPosition(int index, float partialTick) {
-        if (index < 0 || index >= 2)
+        if (index < 0 || index >= LEG_COUNT)
             throw new IndexOutOfBoundsException(index);
 
         if (footTo[index] == null)
             return null;
 
-        if (stepStartTick[index] < 0)
+        if (movingGroup < 0 || GROUP[index] != movingGroup)
             return footTo[index];
 
-        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick[index]) / STEP_TICKS));
+        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick) / STEP_TICKS));
         double smooth = t * t * (3.0 - 2.0 * t);
 
         return footFrom[index].lerp(footTo[index], smooth).add(0.0, Math.sin(Math.PI * t) * 0.18, 0.0);
