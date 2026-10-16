@@ -91,7 +91,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         boolean reset = !onGround();
         if (!reset) {
             for (Vec3 anchor : footTo) {
-                if (anchor != null && anchor.distanceToSqr(position()) > 4.0) {
+                if (anchor != null && anchor.distanceToSqr(position()) > 2.25) {
                     reset = true;
                     break;
                 }
@@ -122,11 +122,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             double z = getZ() - localX * sin + localZ * cos;
 
             BlockHitResult hit = level().clip(new ClipContext(new Vec3(x, getY() + 2.0, z), new Vec3(x, getY() - 2.0, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
-            if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP) {
-                footFrom[i] = null;
-                footTo[i] = null;
+            if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
                 continue;
-            }
 
             desired[i] = hit.getLocation().add(0.0, 0.01, 0.0);
 
@@ -137,35 +134,49 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         }
 
         if (movingGroup >= 0) {
-            if (tickCount - stepStartTick >= STEP_TICKS) {
-                movingGroup = -1;
-                nextGroup = 1 - nextGroup;
-            }
-
-            return;
-        }
-
-        boolean shouldStep = false;
-        for (int i = 0; i < LEG_COUNT; i++) {
-            if (GROUP[i] != nextGroup)
-                continue;
-
-            if (desired[i] == null || footTo[i] == null)
+            if (tickCount - stepStartTick < STEP_TICKS)
                 return;
 
-            double dx = desired[i].x - footTo[i].x;
-            double dy = desired[i].y - footTo[i].y;
-            double dz = desired[i].z - footTo[i].z;
-
-            if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE || Math.abs(dy) > 0.15)
-                shouldStep = true;
+            nextGroup = 1 - movingGroup;
+            movingGroup = -1;
         }
 
-        if (!shouldStep)
+        int selectedGroup = -1;
+        for (int candidate = 0; candidate < 2; candidate++) {
+            int group = (nextGroup + candidate) % 2;
+
+            boolean ready = true;
+            boolean needsStep = false;
+
+            for (int i = 0; i < LEG_COUNT; i++) {
+                if (GROUP[i] != group)
+                    continue;
+
+                if (desired[i] == null || footTo[i] == null) {
+                    ready = false;
+                    break;
+                }
+
+                double dx = desired[i].x - footTo[i].x;
+                double dy = desired[i].y - footTo[i].y;
+                double dz = desired[i].z - footTo[i].z;
+                if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE || Math.abs(dy) > 0.15)
+                    needsStep = true;
+            }
+
+            if (ready && needsStep) {
+                selectedGroup = group;
+                break;
+            }
+        }
+
+        if (selectedGroup < 0)
             return;
 
-        movingGroup = nextGroup;
+// 선택된 세 다리만 새 착지점으로 이동한다.
+        movingGroup = selectedGroup;
         stepStartTick = tickCount;
+
         for (int i = 0; i < LEG_COUNT; i++) {
             if (GROUP[i] != movingGroup)
                 continue;
