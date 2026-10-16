@@ -88,7 +88,7 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
             if (!GEOMETRY_ID.equals(geometry.identifier()))
                 continue;
 
-            Skeleton skeleton = skeletons.get(i);
+            this.skeleton = skeletons.get(i);
 
             modelRenderer = new BedrockModelRenderer(geometry, skeleton);
             skeletonPose = new SkeletonPose(skeleton);
