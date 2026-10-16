@@ -41,14 +41,26 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
         pose.rotateLocalDegrees("body", tilt.x(), 0.0f, tilt.y());
 
         for (int i = 0; i < LEGS.length; i++) {
-            Vec3 foot = entity.footPosition(i, partialTick, true);
-            if (foot == null)
-                continue;
-
-            Vector3f target = toModelPosition(entity, entityYaw, partialTick, foot);
-            Vector3f pole = new Vector3f(i % 2 == 0 ? 9.0f : -9.0f, 7.0f, (i / 2 - 1) * 6.0f);
-
             String name = LEGS[i];
+
+            int side = i % 2 == 0 ? 1 : -1;
+            int row = i / 2 - 1;
+
+            Vec3 foot = entity.footPosition(i, partialTick, true);
+
+            Vector3f target;
+            Vector3f pole;
+
+            if (foot != null) {
+                target = toModelPosition(entity, entityYaw, partialTick, foot);
+                pole = new Vector3f(side * 9.0f, 7.0f, row * 6.0f);
+            } else {
+                Vector3f hip = pose.getModelPivot(name + "upper");
+
+                target = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
+                pole = new Vector3f(hip).add(side * 14.0f, 4.0f, row * 4.0f);
+            }
+
             pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole);
         }
     }
