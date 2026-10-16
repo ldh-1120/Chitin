@@ -60,7 +60,7 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
                 target = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
 
             Vector3f pole = createLegPole(pose, hip, side, row);
-            pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole);
+            pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole, 30.0f, 140.0f);
         }
     }
 
