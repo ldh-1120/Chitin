@@ -20,16 +20,21 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
 
     @Override
     protected void modifyPose(MantisEntity entity, float entityYaw, float partialTick, SkeletonPose pose) {
-        Vec3 foot = entity.footPosition(partialTick);
-        if (foot == null)
-            return;
+        for (int i = 0; i < 2; i++) {
+            Vec3 foot = entity.footPosition(i, partialTick);
+            if (foot == null)
+                continue;
 
-        Vec3 relative = foot.subtract(entity.getPosition(partialTick));
-        Vector3f target = new Vector3f((float) relative.x, (float) relative.y, (float) relative.z);
+            Vec3 relative = foot.subtract(entity.getPosition(partialTick));
+            Vector3f target = new Vector3f((float) relative.x, (float) relative.y, (float) relative.z);
 
-        target.rotate(Axis.YP.rotationDegrees(180.0f - entityYaw).invert());
-        target.mul(16.0f);
+            target.rotate(Axis.YP.rotationDegrees(180.0f - entityYaw).invert());
+            target.mul(16.0f);
 
-        pose.solveTwoBoneIk("front_leg_upper", "front_leg_lower", "front_leg_foot", target, KNEE_POLE);
+            String prefix = i == 0 ? "front_leg_" : "front_left_leg_";
+            Vector3f pole = new Vector3f(i == 0 ? 3.0f : -3.0f, 7.0f, -8.0f);
+
+            pose.solveTwoBoneIk(prefix + "upper", prefix + "lower", prefix + "foot", target, pole);
+        }
     }
 }

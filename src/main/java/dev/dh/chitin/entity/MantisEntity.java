@@ -29,9 +29,9 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private final MotionInstance motion = new MotionInstance();
     private final MotionLayer attackLayer = motion.addLayer("attack", BoneMask.subtree("head"), MotionLayer.Mode.OVERRIDE);
 
-    private Vec3 footFrom;
-    private Vec3 footTo;
-    private int stepStartTick = -1;
+    private final Vec3[] footFrom = new Vec3[2];
+    private final Vec3[] footTo = new Vec3[2];
+    private final int[] stepStartTick = {-1, -1};
 
     public MantisEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -76,66 +76,85 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         if (phase == 53)
             attackLayer.player().stop();
 
-        updateFoot();
+        updateFeet();
     }
 
-    private void updateFoot() {
+    private void updateFeet() {
         if (!onGround()) {
-            footFrom = null;
-            footTo = null;
-            stepStartTick = -1;
+            for (int i = 0; i < 2; i++) {
+                footFrom[i] = null;
+                footTo[i] = null;
+                stepStartTick[i] = -1;
+            }
             return;
         }
 
-        Vector3f offset = new Vector3f(7.0f / 16.0f, 0.0f, -1.0f / 16.0f).rotateY((float) Math.toRadians(180.0f - getYRot()));
+        float rotation = (float) Math.toRadians(180.0f - getYRot());
 
-        double x = getX() + offset.x();
-        double z = getZ() + offset.z();
+        for (int i = 0; i < 2; i++) {
+            float xOffset = i == 0 ? 7.0f / 16.0f : -7.0f / 16.0f;
 
-        Vec3 start = new Vec3(x, getY() + 2.0, z);
-        Vec3 end = new Vec3(x, getY() - 2.0, z);
+            Vector3f offset = new Vector3f(xOffset, 0.0f, -1.0f / 16.0f).rotateY(rotation);
 
-        BlockHitResult hit = level().clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
-        if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
-            return;
+            double x = getX() + offset.x();
+            double z = getZ() + offset.z();
 
-        Vec3 ground = hit.getLocation().add(0.0, 0.01, 0.0);
-        if (footTo == null || footTo.distanceToSqr(position()) > 4.0) {
-            footFrom = ground;
-            footTo = ground;
-            stepStartTick = -1;
-            return;
-        }
+            Vec3 start = new Vec3(x, getY() + 2.0, z);
+            Vec3 end = new Vec3(x, getY() - 2.0, z);
 
-        if (stepStartTick >= 0) {
-            if (tickCount - stepStartTick < STEP_TICKS)
-                return;
+            BlockHitResult hit = level().clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP) {
+                footFrom[i] = null;
+                footTo[i] = null;
+                stepStartTick[i] = -1;
+                continue;
+            }
 
-            stepStartTick = -1;
-            footFrom = footTo;
-        }
+            Vec3 ground = hit.getLocation().add(0.0, 0.01, 0.0);
+            if (footTo[i] == null || footTo[i].distanceToSqr(position()) > 4.0) {
+                footFrom[i] = ground;
+                footTo[i] = ground;
+                stepStartTick[i] = -1;
+                continue;
+            }
 
-        double dx = ground.x - footTo.x;
-        double dz = ground.z - footTo.z;
+            if (stepStartTick[i] >= 0) {
+                if (tickCount - stepStartTick[i] < STEP_TICKS)
+                    continue;
 
-        if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE) {
-            footFrom = footTo;
-            footTo = ground;
-            stepStartTick = tickCount;
+                stepStartTick[i] = -1;
+                footFrom[i] = footTo[i];
+            }
+
+            int other = 1 - i;
+            if (stepStartTick[other] >= 0)
+                continue;
+
+            double dx = ground.x - footTo[i].x;
+            double dz = ground.z - footTo[i].z;
+
+            if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE) {
+                footFrom[i] = footTo[i];
+                footTo[i] = ground;
+                stepStartTick[i] = tickCount;
+            }
         }
     }
 
-    public Vec3 footPosition(float partialTick) {
-        if (footTo == null)
+    public Vec3 footPosition(int index, float partialTick) {
+        if (index < 0 || index >= 2)
+            throw new IndexOutOfBoundsException(index);
+
+        if (footTo[index] == null)
             return null;
 
-        if (stepStartTick < 0)
-            return footTo;
+        if (stepStartTick[index] < 0)
+            return footTo[index];
 
-        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick) / STEP_TICKS));
+        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick[index]) / STEP_TICKS));
         double smooth = t * t * (3.0 - 2.0 * t);
 
-        return footFrom.lerp(footTo, smooth).add(0.0, Math.sin(Math.PI * t) * 0.18, 0.0);
+        return footFrom[index].lerp(footTo[index], smooth).add(0.0, Math.sin(Math.PI * t) * 0.18, 0.0);
     }
 
     @Override

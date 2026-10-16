@@ -59,6 +59,35 @@
           "name": "front_leg_foot",
           "parent": "front_leg_lower",
           "pivot": [3, -6, -1]
+        },
+        {
+          "name": "front_left_leg_upper",
+          "parent": "body",
+          "pivot": [-3, 8, -1],
+          "cubes": [
+            {
+              "origin": [-3.5, 1, -2],
+              "size": [1, 7, 2],
+              "uv": [20, 12]
+            }
+          ]
+        },
+        {
+          "name": "front_left_leg_lower",
+          "parent": "front_left_leg_upper",
+          "pivot": [-3, 1, -1],
+          "cubes": [
+            {
+              "origin": [-3.5, -6, -2],
+              "size": [1, 7, 2],
+              "uv": [20, 20]
+            }
+          ]
+        },
+        {
+          "name": "front_left_leg_foot",
+          "parent": "front_left_leg_lower",
+          "pivot": [-3, -6, -1]
         }
       ]
     }
