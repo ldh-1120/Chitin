@@ -50,14 +50,7 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
             int row = i / 2 - 1;
 
             Vector3f hip = pose.getModelPivot(name + "upper");
-            Vec3 foot = entity.footPosition(i, partialTick, true);
-
-            Vector3f target;
-
-            if (foot != null)
-                target = toModelPosition(entity, entityYaw, partialTick, foot);
-            else
-                target = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
+            Vector3f target = resolveLegTarget(entity, entityYaw, partialTick, pose, i, hip, blend);
 
             Vector3f pole = createLegPole(pose, hip, side, row);
             pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole, 30.0f, 140.0f);
@@ -74,13 +67,18 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
 
         try {
             stack.scale(1.0f / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f);
+
+            float airBlend = entity.getAirBlend(partialTick);
+            float blend = airBlend * airBlend * (3.0f - 2.0f * airBlend);
             for (int i = 0; i < LEGS.length; i++) {
                 Vec3 foot = entity.footPosition(i, partialTick, true);
                 if (foot == null)
                     continue;
 
                 String name = LEGS[i];
-                Vector3f target = toModelPosition(entity, entityYaw, partialTick, foot);
+                Vector3f hip = pose.getModelPivot(name + "upper");
+
+                Vector3f target = resolveLegTarget(entity, entityYaw, partialTick, pose, i, hip, blend);
                 Vector3f actual = pose.getModelPivot(name + "foot");
                 Vector3f knee = pose.getModelPivot(name + "lower");
 
@@ -111,6 +109,28 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
         } finally {
             stack.popPose();
         }
+    }
+
+    private static Vector3f resolveLegTarget(MantisEntity entity, float entityYaw, float partialTick, SkeletonPose pose, int index, Vector3f hip, float blend) {
+        int side = index % 2 == 0 ? 1 : -1;
+        int row = index / 2 - 1;
+
+        Vector3f airOffset = new Vector3f(side * 7.0f, -5.0f, row * 2.0f);
+        pose.getModelMatrix("body").transformDirection(airOffset);
+
+        Vector3f airTarget = new Vector3f(hip).add(airOffset);
+        Vector3f groundTarget = null;
+
+        Vec3 foot = entity.footPosition(index, partialTick, true);
+        if (foot != null)
+            groundTarget = toModelPosition(entity, entityYaw, partialTick, foot);
+        else if (!entity.onGround())
+            groundTarget = entity.getTakeoffTarget(index);
+
+        if (groundTarget == null)
+            return airTarget;
+
+        return groundTarget.lerp(airTarget, blend);
     }
 
     private static Vector3f createLegPole(SkeletonPose pose, Vector3f hip, int side, int row) {

@@ -104,9 +104,6 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
         previousTerrainTilt.set(terrainTilt);
         previousBodyHeight = bodyHeight;
-
-        previousTerrainTilt.set(terrainTilt);
-        previousBodyHeight = bodyHeight;
         previousAirBlend = airBlend;
 
         boolean grounded = onGround();
@@ -419,7 +416,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             double worldX = getX() + footX * cos + footZ * sin;
             double worldZ = getZ() - footX * sin + footZ * cos;
 
-            BlockHitResult hit = level().clip(new ClipContext(new Vec3(worldX, getY() + 2.0, worldZ), new Vec3(worldX, getY() - 2.0, worldZ), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+            BlockHitResult hit = level().clip(new ClipContext(new Vec3(worldX, getY() + 2.0, worldZ), new Vec3(worldX, getY() - 4.0, worldZ), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
             if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
                 continue;
 
