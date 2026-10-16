@@ -26,8 +26,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private static final String ATTACK = "animation.mantis.attack";
 
     private static final int LEG_COUNT = 6;
-    private static final int STEP_TICKS = 6;
-    private static final double STEP_DISTANCE = 0.16;
+    private static final int STEP_TICKS = 8;
+    private static final double STEP_DISTANCE = 0.12;
 
     private static final int[] GROUP = {0, 1, 1, 0, 0, 1};
 
@@ -40,6 +40,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private int movingGroup = -1;
     private int nextGroup = 0;
     private int stepStartTick;
+    private int stepDurationTicks = STEP_TICKS;
 
     public MantisEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -108,6 +109,11 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
                 return;
         }
 
+        double movementX = getX() - xo;
+        double movementZ = getZ() - zo;
+        double speedFactor = Math.min(1.0, Math.hypot(movementX, movementZ) / 0.15);
+
+        double stepDistance = STEP_DISTANCE + 0.09 * speedFactor;
         Vec3[] desired = new Vec3[LEG_COUNT];
 
         double angle = Math.toRadians(180.0 - getYRot());
@@ -118,8 +124,11 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             double localX = (i % 2 == 0 ? 7.0 : -7.0) / 16.0;
             double localZ = (i / 2 - 1) * 6.0 / 16.0;
 
-            double x = getX() + localX * cos + localZ * sin;
-            double z = getZ() - localX * sin + localZ * cos;
+            double leadX = Math.max(-0.20, Math.min(0.20, movementX * 2.0));
+            double leadZ = Math.max(-0.20, Math.min(0.20, movementZ * 2.0));
+
+            double x = getX() + localX * cos + localZ * sin + leadX;
+            double z = getZ() - localX * sin + localZ * cos + leadZ;
 
             BlockHitResult hit = level().clip(new ClipContext(new Vec3(x, getY() + 2.0, z), new Vec3(x, getY() - 2.0, z), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
             if (hit.getType() != HitResult.Type.BLOCK || hit.getDirection() != Direction.UP)
@@ -134,7 +143,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         }
 
         if (movingGroup >= 0) {
-            if (tickCount - stepStartTick < STEP_TICKS)
+            if (tickCount - stepStartTick < stepDurationTicks)
                 return;
 
             nextGroup = 1 - movingGroup;
@@ -160,7 +169,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
                 double dx = desired[i].x - footTo[i].x;
                 double dy = desired[i].y - footTo[i].y;
                 double dz = desired[i].z - footTo[i].z;
-                if (dx * dx + dz * dz > STEP_DISTANCE * STEP_DISTANCE || Math.abs(dy) > 0.15)
+                if (dx * dx + dz * dz > stepDistance * stepDistance || Math.abs(dy) > 0.15)
                     needsStep = true;
             }
 
@@ -173,9 +182,10 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         if (selectedGroup < 0)
             return;
 
-// 선택된 세 다리만 새 착지점으로 이동한다.
         movingGroup = selectedGroup;
         stepStartTick = tickCount;
+
+        stepDurationTicks = STEP_TICKS - (int) Math.round(4.0 * speedFactor);
 
         for (int i = 0; i < LEG_COUNT; i++) {
             if (GROUP[i] != movingGroup)
@@ -196,10 +206,13 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         if (movingGroup < 0 || GROUP[index] != movingGroup)
             return footTo[index];
 
-        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick) / STEP_TICKS));
+        double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick) / stepDurationTicks));
         double smooth = t * t * (3.0 - 2.0 * t);
 
-        return footFrom[index].lerp(footTo[index], smooth).add(0.0, Math.sin(Math.PI * t) * 0.18, 0.0);
+        double stride = footFrom[index].distanceTo(footTo[index]);
+        double lift = Math.min(0.20, stride * 0.5);
+
+        return footFrom[index].lerp(footTo[index], smooth).add(0.0, Math.sin(Math.PI * t) * lift, 0.0);
     }
 
     @Override
