@@ -196,7 +196,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         }
     }
 
-    public Vec3 footPosition(int index, float partialTick) {
+    public Vec3 footPosition(int index, float partialTick, boolean includeLift) {
         if (index < 0 || index >= LEG_COUNT)
             throw new IndexOutOfBoundsException(index);
 
@@ -209,8 +209,11 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         double t = Math.max(0.0, Math.min(1.0, (tickCount + partialTick - stepStartTick) / stepDurationTicks));
         double smooth = t * t * (3.0 - 2.0 * t);
 
-        double stride = footFrom[index].distanceTo(footTo[index]);
-        double lift = Math.min(0.20, stride * 0.5);
+        double lift = 0.0;
+        if (includeLift) {
+            double stride = footFrom[index].distanceTo(footTo[index]);
+            lift = Math.min(0.20, stride * 0.5);
+        }
 
         return footFrom[index].lerp(footTo[index], smooth).add(0.0, Math.sin(Math.PI * t) * lift, 0.0);
     }

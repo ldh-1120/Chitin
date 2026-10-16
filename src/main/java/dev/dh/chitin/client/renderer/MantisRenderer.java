@@ -27,8 +27,45 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
 
     @Override
     protected void modifyPose(MantisEntity entity, float entityYaw, float partialTick, SkeletonPose pose) {
+        double rightHeight = 0.0;
+        double leftHeight = 0.0;
+        double frontHeight = 0.0;
+        double rearHeight = 0.0;
+
+        boolean grounded = true;
         for (int i = 0; i < LEGS.length; i++) {
-            Vec3 foot = entity.footPosition(i, partialTick);
+            Vec3 foot = entity.footPosition(i, partialTick, false);
+            if (foot == null) {
+                grounded = false;
+                break;
+            }
+
+            if (i % 2 == 0)
+                rightHeight += foot.y;
+            else
+                leftHeight += foot.y;
+
+            if (i < 2)
+                frontHeight += foot.y;
+            else if (i >= 4)
+                rearHeight += foot.y;
+        }
+
+        if (grounded) {
+            double sideDifference = (rightHeight - leftHeight) / 3.0;
+            double lengthDifference = (rearHeight - frontHeight) / 2.0;
+
+            float pitch = (float) Math.toDegrees(Math.atan(-lengthDifference / (12.0 / 16.0)));
+            float roll = (float) Math.toDegrees(Math.atan(sideDifference / (14.0 / 16.0)));
+
+            pitch = Math.max(-10.0f, Math.min(10.0f, pitch));
+            roll = Math.max(-10.0f, Math.min(10.0f, roll));
+
+            pose.setRotationDegrees("body", pitch, 0.0f, roll);
+        }
+
+        for (int i = 0; i < LEGS.length; i++) {
+            Vec3 foot = entity.footPosition(i, partialTick, true);
             if (foot == null)
                 continue;
 
