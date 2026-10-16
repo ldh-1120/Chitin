@@ -34,6 +34,9 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
 
     @Override
     protected void modifyPose(MantisEntity entity, float entityYaw, float partialTick, SkeletonPose pose) {
+        float height = entity.getBodyHeight(partialTick);
+        pose.addTranslation("body", 0.0f, height * 16.0f, 0.0f);
+
         Vector2f tilt = entity.getTerrainTilt(partialTick);
         pose.rotateLocalDegrees("body", tilt.x(), 0.0f, tilt.y());
 

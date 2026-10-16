@@ -30,6 +30,10 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private static final int STEP_TICKS = 8;
     private static final double STEP_DISTANCE = 0.12;
 
+    private static final double HIP_HEIGHT = 8.0 / 16.0;
+    private static final double MAX_LEG_REACH = 13.0 / 16.0;
+    private static final float MAX_BODY_OFFSET = 0.15f;
+
     private static final int[] GROUP = {0, 1, 1, 0, 0, 1};
 
     private final MotionInstance motion = new MotionInstance();
@@ -40,6 +44,9 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
     private final Vector2f previousTerrainTilt = new Vector2f();
     private final Vector2f terrainTilt = new Vector2f();
+
+    private float previousBodyHeight;
+    private float bodyHeight;
 
     private int movingGroup = -1;
     private int nextGroup = 0;
@@ -90,9 +97,80 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             attackLayer.player().stop();
 
         previousTerrainTilt.set(terrainTilt);
+        previousBodyHeight = bodyHeight;
 
         updateFeet();
         updateTerrainTilt();
+        updateBodyHeight();
+    }
+
+    private void updateBodyHeight() {
+        double angle = Math.toRadians(180.0 - getYRot());
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+
+        double totalOffset = 0.0;
+        double lowerBound = Double.NEGATIVE_INFINITY;
+        double upperBound = Double.POSITIVE_INFINITY;
+
+        int count = 0;
+
+        for (int i = 0; i < LEG_COUNT; i++) {
+            Vec3 foot = footTo[i];
+            if (foot == null)
+                continue;
+
+            if (movingGroup >= 0 && GROUP[i] == movingGroup)
+                continue;
+
+            int side = i % 2 == 0 ? 1 : -1;
+            int row = i / 2 - 1;
+
+            double hipX = side * 3.0 / 16.0;
+            double hipZ = row / 16.0;
+
+            double worldX = getX() + hipX * cos + hipZ * sin;
+            double worldZ = getZ() - hipX * sin + hipZ * cos;
+
+            double dx = foot.x - worldX;
+            double dz = foot.z - worldZ;
+
+            double horizontalSquared = dx * dx + dz * dz;
+            double reachSquared = MAX_LEG_REACH * MAX_LEG_REACH;
+
+            if (horizontalSquared >= reachSquared)
+                continue;
+
+            double verticalReach = Math.sqrt(reachSquared - horizontalSquared);
+            double baseHipY = getY() + HIP_HEIGHT;
+
+            double minimum = foot.y - verticalReach - baseHipY;
+            double maximum = foot.y + verticalReach - baseHipY;
+
+            lowerBound = Math.max(lowerBound, minimum);
+            upperBound = Math.min(upperBound, maximum);
+
+            totalOffset += foot.y - getY() - 0.01;
+
+            count++;
+        }
+
+        double target = 0.0;
+
+        if (count >= 3) {
+            target = totalOffset / count;
+            if (lowerBound <= upperBound)
+                target = Math.max(lowerBound, Math.min(upperBound, target));
+
+            target = Math.max(-MAX_BODY_OFFSET, Math.min(MAX_BODY_OFFSET, target));
+        }
+
+        bodyHeight += (float) (target - bodyHeight) * 0.20f;
+    }
+
+    public float getBodyHeight(float partialTick) {
+        float t = Math.max(0.0f, Math.min(1.0f, partialTick));
+        return previousBodyHeight + (bodyHeight - previousBodyHeight) * t;
     }
 
     private void updateTerrainTilt() {
@@ -295,7 +373,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             Vec3 landing = hit.getLocation().add(0.0, 0.01, 0.0);
 
             double dx = footX - hipX;
-            double dy = landing.y - getY() - hipY;
+            double dy = landing.y - getY() - hipY - bodyHeight;
             double dz = footZ - hipZ;
 
             double distanceSquared = dx * dx + dy * dy + dz * dz;
