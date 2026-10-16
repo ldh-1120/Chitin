@@ -1,0 +1,37 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.chitin.mantis",
+        "texture_width": 32,
+        "texture_height": 32
+      },
+      "bones": [
+        {
+          "name": "body",
+          "pivot": [0, 12, 0],
+          "cubes": [
+            {
+              "origin": [-4, 8, -2],
+              "size": [8, 8, 4],
+              "uv": [0, 0]
+            }
+          ]
+        },
+        {
+          "name": "head",
+          "parent": "body",
+          "pivot": [0, 18, 0],
+          "cubes": [
+            {
+              "origin": [-3, 16, -6],
+              "size": [6, 6, 4],
+              "uv": [0, 12]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
