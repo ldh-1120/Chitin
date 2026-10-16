@@ -28,7 +28,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
     private static final int LEG_COUNT = 6;
     private static final int STEP_TICKS = 8;
-    private static final double STEP_DISTANCE = 0.12;
+    private static final double STEP_DISTANCE = 0.22;
+    private static final float AIR_BLEND_SPEED = 0.25f;
 
     private static final double HIP_HEIGHT = 8.0 / 16.0;
     private static final double MAX_LEG_REACH = 19.0 / 16.0;
@@ -41,6 +42,11 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
     private final Vec3[] footFrom = new Vec3[LEG_COUNT];
     private final Vec3[] footTo = new Vec3[LEG_COUNT];
+    private final Vector3f[] takeoffTargets = new Vector3f[LEG_COUNT];
+
+    private float previousAirBlend;
+    private float airBlend;
+    private boolean wasGrounded = true;
 
     private final Vector2f previousTerrainTilt = new Vector2f();
     private final Vector2f terrainTilt = new Vector2f();
@@ -99,9 +105,58 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         previousTerrainTilt.set(terrainTilt);
         previousBodyHeight = bodyHeight;
 
+        previousTerrainTilt.set(terrainTilt);
+        previousBodyHeight = bodyHeight;
+        previousAirBlend = airBlend;
+
+        boolean grounded = onGround();
+        if (wasGrounded && !grounded)
+            captureTakeoffTargets();
+
+        wasGrounded = grounded;
+
+        if (grounded)
+            airBlend = Math.max(0.0f, airBlend - AIR_BLEND_SPEED);
+        else
+            airBlend = Math.min(1.0f, airBlend + AIR_BLEND_SPEED);
+
         updateFeet();
         updateTerrainTilt();
         updateBodyHeight();
+    }
+
+    private void captureTakeoffTargets() {
+        double angle = Math.toRadians(180.0 - getYRot());
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+
+        for (int i = 0; i < LEG_COUNT; i++) {
+            Vec3 foot = footPosition(i, 0.0f, true);
+            if (foot == null) {
+                takeoffTargets[i] = null;
+                continue;
+            }
+
+            Vec3 relative = foot.subtract(position());
+
+            double localX = relative.x * cos - relative.z * sin;
+            double localZ = relative.x * sin + relative.z * cos;
+
+            takeoffTargets[i] = new Vector3f((float) (localX * 16.0), (float) (relative.y * 16.0), (float) (localZ * 16.0));
+        }
+    }
+
+    public float getAirBlend(float partialTick) {
+        float t = Math.max(0.0f, Math.min(1.0f, partialTick));
+        return previousAirBlend + (airBlend - previousAirBlend) * t;
+    }
+
+    public Vector3f getTakeoffTarget(int index) {
+        if (index < 0 || index >= LEG_COUNT)
+            throw new IndexOutOfBoundsException(index);
+
+        Vector3f target = takeoffTargets[index];
+        return target == null ? null : new Vector3f(target);
     }
 
     private void updateBodyHeight() {
@@ -358,8 +413,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
 
         double maxReach = MAX_LEG_REACH;
         for (int attempt = 0; attempt < 2; attempt++) {
-            double footX = side * 7.0 / 16.0 + (attempt == 0 ? leadX : 0.0);
-            double footZ = row * 6.0 / 16.0 + (attempt == 0 ? leadZ : 0.0);
+            double footX = side * 12.0 / 16.0 + (attempt == 0 ? leadX : 0.0);
+            double footZ = row * 10.0 / 16.0 + (attempt == 0 ? leadZ : 0.0);
 
             double worldX = getX() + footX * cos + footZ * sin;
             double worldZ = getZ() - footX * sin + footZ * cos;

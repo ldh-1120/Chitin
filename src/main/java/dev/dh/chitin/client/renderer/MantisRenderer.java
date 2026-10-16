@@ -40,27 +40,38 @@ public final class MantisRenderer extends CascadeEntityRenderer<MantisEntity> {
         Vector2f tilt = entity.getTerrainTilt(partialTick);
         pose.rotateLocalDegrees("body", tilt.x(), 0.0f, tilt.y());
 
+        float airBlend = entity.getAirBlend(partialTick);
+
+// 자연스럽게 시작하고 끝나는 보간 곡선.
+        float blend = airBlend * airBlend * (3.0f - 2.0f * airBlend);
+
         for (int i = 0; i < LEGS.length; i++) {
             String name = LEGS[i];
 
             int side = i % 2 == 0 ? 1 : -1;
             int row = i / 2 - 1;
 
+            Vector3f hip = pose.getModelPivot(name + "upper");
+
+            Vector3f airTarget = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
+            Vector3f airPole = new Vector3f(hip).add(side * 14.0f, 4.0f, row * 4.0f);
+
+            Vector3f groundPole = new Vector3f(side * 9.0f, 7.0f, row * 6.0f);
             Vec3 foot = entity.footPosition(i, partialTick, true);
 
+            Vector3f groundTarget = null;
+            if (foot != null)
+                groundTarget = toModelPosition(entity, entityYaw, partialTick, foot);
+            else if (!entity.onGround())
+                groundTarget = entity.getTakeoffTarget(i);
+
             Vector3f target;
-            Vector3f pole;
+            if (groundTarget == null)
+                target = airTarget;
+            else
+                target = new Vector3f(groundTarget).lerp(airTarget, blend);
 
-            if (foot != null) {
-                target = toModelPosition(entity, entityYaw, partialTick, foot);
-                pole = new Vector3f(side * 9.0f, 7.0f, row * 6.0f);
-            } else {
-                Vector3f hip = pose.getModelPivot(name + "upper");
-
-                target = new Vector3f(hip).add(side * 7.0f, -5.0f, row * 2.0f);
-                pole = new Vector3f(hip).add(side * 14.0f, 4.0f, row * 4.0f);
-            }
-
+            Vector3f pole = groundPole.lerp(airPole, blend);
             pose.solveTwoBoneIk(name + "upper", name + "lower", name + "foot", target, pole);
         }
     }
