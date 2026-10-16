@@ -1,7 +1,9 @@
 package dev.dh.chitin.entity;
 
 import dev.dh.cascade.animation.AnimationPlayer;
+import dev.dh.cascade.animation.BoneMask;
 import dev.dh.cascade.animation.MotionInstance;
+import dev.dh.cascade.animation.MotionLayer;
 import dev.dh.cascade.api.MotionEntity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -14,9 +16,8 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
     private static final String IDLE = "animation.mantis.idle";
     private static final String ATTACK = "animation.mantis.attack";
 
-    private static final float ATTACK_DURATION = 0.6f;
-
     private final MotionInstance motion = new MotionInstance();
+    private final MotionLayer attackLayer = motion.addLayer("attack", BoneMask.subtree("head"), MotionLayer.Mode.OVERRIDE);
 
     public MantisEntity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -43,15 +44,21 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
         if (!level().isClientSide)
             return;
 
-        AnimationPlayer player = motion.player();
-        if (!player.isPlaying())
-            player.play(IDLE, tickCount);
+        AnimationPlayer base = motion.player();
+        if (!base.isPlaying())
+            base.play(IDLE, tickCount);
 
-        if (tickCount % 100 == 40)
-            player.crossFade(ATTACK, tickCount, 0.15f);
+        int phase = tickCount % 100;
+        if (phase == 40) {
+            attackLayer.player().play(ATTACK, tickCount);
+            attackLayer.fadeTo(1.0f, tickCount, 0.1f);
+        }
 
-        if (ATTACK.equals(player.currentAnimation()) && player.getTimeSeconds(tickCount) >= ATTACK_DURATION)
-            player.crossFade(IDLE, tickCount, 0.2f);
+        if (phase == 48)
+            attackLayer.fadeTo(0.0f, tickCount, 0.2f);
+
+        if (phase == 53)
+            attackLayer.player().stop();
     }
 
     @Override

@@ -34,11 +34,11 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     private List<BedrockGeometry> loadedGeometries;
     private Map<String, BedrockAnimation> loadedAnimations;
 
-    private BedrockModelRenderer modelRenderer;
-    private SkeletonPose skeletonPose;
-    private SkeletonPose previousPose;
-    private SkeletonPose currentPose;
     private Skeleton skeleton;
+    private SkeletonPose skeletonPose;
+
+    private BedrockModelRenderer modelRenderer;
+    private AnimationBlender blender;
 
     private Map<String, AnimationClip> animationClips = Map.of();
 
@@ -48,28 +48,27 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
     }
 
     @Override
-    public void render(MantisEntity entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
+    public void render(MantisEntity entity, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
         updateModel();
         updateAnimations();
 
-        if (modelRenderer != null && skeletonPose != null) {
-            AnimationPlayer player = entity.motion().player();
-            float nowTick = entity.tickCount + partialTick;
+        if (modelRenderer != null && skeletonPose != null && blender != null) {
+            double nowTick = entity.tickCount + (double) partialTick;
 
-            AnimationPlayer.Frame frame = player.sampleFrame(nowTick);
-            AnimationBlender.apply(frame, animationClips, skeletonPose, previousPose, currentPose);
+            AnimationPlayer.Frame frame = entity.motion().player().sampleFrame(nowTick);
+            blender.apply(frame, entity.motion().layers(), nowTick, animationClips, skeletonPose);
 
             poseStack.pushPose();
 
             poseStack.mulPose(Axis.YP.rotationDegrees(180.0f - entityYaw));
 
-            VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
+            VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
             modelRenderer.render(poseStack, consumer, packedLight, skeletonPose);
 
             poseStack.popPose();
         }
 
-        super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+        super.render(entity, entityYaw, partialTick, poseStack, buffers, packedLight);
     }
 
     private void updateModel() {
@@ -80,11 +79,10 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
 
         loadedGeometries = geometries;
 
-        modelRenderer = null;
         skeleton = null;
         skeletonPose = null;
-        previousPose = null;
-        currentPose = null;
+        modelRenderer = null;
+        blender = null;
 
         loadedAnimations = null;
         animationClips = Map.of();
@@ -95,13 +93,11 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
             if (!GEOMETRY_ID.equals(geometry.identifier()))
                 continue;
 
-            this.skeleton = skeletons.get(i);
+            skeleton = skeletons.get(i);
 
             modelRenderer = new BedrockModelRenderer(geometry, skeleton);
-
             skeletonPose = new SkeletonPose(skeleton);
-            previousPose = new SkeletonPose(skeleton);
-            currentPose = new SkeletonPose(skeleton);
+            blender = new AnimationBlender(skeleton);
 
             break;
         }
@@ -119,10 +115,9 @@ public final class MantisRenderer extends EntityRenderer<MantisEntity> {
         }
 
         Map<String, AnimationClip> compiled = new HashMap<>();
-        for (Map.Entry<String, BedrockAnimation> entry : animations.entrySet()) {
-            AnimationClip clip = new AnimationClip(entry.getValue(), skeleton);
-            compiled.put(entry.getKey(), clip);
-        }
+
+        for (Map.Entry<String, BedrockAnimation> entry : animations.entrySet())
+            compiled.put(entry.getKey(), new AnimationClip(entry.getValue(), skeleton));
 
         animationClips = Map.copyOf(compiled);
     }
