@@ -30,6 +30,35 @@
               "uv": [0, 12]
             }
           ]
+        },
+        {
+          "name": "front_leg_upper",
+          "parent": "body",
+          "pivot": [3, 12, -1],
+          "cubes": [
+            {
+              "origin": [2.5, 7, -2],
+              "size": [1, 5, 2],
+              "uv": [20, 12]
+            }
+          ]
+        },
+        {
+          "name": "front_leg_lower",
+          "parent": "front_leg_upper",
+          "pivot": [3, 7, -1],
+          "cubes": [
+            {
+              "origin": [2.5, 2, -2],
+              "size": [1, 5, 2],
+              "uv": [20, 20]
+            }
+          ]
+        },
+        {
+          "name": "front_leg_foot",
+          "parent": "front_leg_lower",
+          "pivot": [3, 2, -1]
         }
       ]
     }
