@@ -44,7 +44,7 @@ public class MantisEntity extends PathfinderMob implements MotionEntity {
             return;
 
         AnimationPlayer player = motion.player();
-        if (player.isPlaying())
+        if (!player.isPlaying())
             player.play(IDLE, tickCount);
 
         if (tickCount % 100 == 40)
